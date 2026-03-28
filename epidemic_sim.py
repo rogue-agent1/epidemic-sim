@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """SIR epidemic model simulation."""
-import sys
-def sir(S0,I0,R0,beta,gamma,days):
-    N=S0+I0+R0;S,I,R=float(S0),float(I0),float(R0)
-    history=[(0,S,I,R)]
-    for d in range(1,days+1):
+def sir(S0=999,I0=1,R0=0,beta=0.3,gamma=0.1,days=160):
+    N=S0+I0+R0;S,I,R=float(S0),float(I0),float(R0);history=[]
+    for d in range(days):
+        history.append({"day":d,"S":int(S),"I":int(I),"R":int(R)})
         dS=-beta*S*I/N;dI=beta*S*I/N-gamma*I;dR=gamma*I
         S+=dS;I+=dI;R+=dR
-        history.append((d,S,I,R))
     return history
-def main():
-    pop=10000;infected=10;beta=0.3;gamma=0.1
-    R0=beta/gamma
-    print(f"SIR Model: pop={pop}, I0={infected}, β={beta}, γ={gamma}, R0={R0:.1f}")
-    history=sir(pop-infected,infected,0,beta,gamma,160)
-    print(f"\n{'Day':>4} {'S':>7} {'I':>7} {'R':>7}")
-    for d,S,I,R in history[::10]:
-        bar='▓'*int(I/200)
-        print(f"{d:4.0f} {S:7.0f} {I:7.0f} {R:7.0f} {bar}")
-    peak=max(history,key=lambda x:x[2])
-    print(f"\nPeak infection: day {peak[0]}, {peak[2]:.0f} infected ({peak[2]/pop*100:.1f}%)")
-if __name__=="__main__": main()
+def seir(S0=999,E0=0,I0=1,R0=0,beta=0.3,sigma=0.2,gamma=0.1,days=200):
+    N=S0+E0+I0+R0;S,E,I,R=float(S0),float(E0),float(I0),float(R0);history=[]
+    for d in range(days):
+        history.append({"day":d,"S":int(S),"E":int(E),"I":int(I),"R":int(R)})
+        dS=-beta*S*I/N;dE=beta*S*I/N-sigma*E;dI=sigma*E-gamma*I;dR=gamma*I
+        S+=dS;E+=dE;I+=dI;R+=dR
+    return history
+if __name__=="__main__":
+    h=sir();peak=max(h,key=lambda x:x["I"])
+    print(f"SIR: peak infections={peak['I']} on day {peak['day']}")
+    print(f"R0={0.3/0.1:.1f}")
+    h2=seir();peak2=max(h2,key=lambda x:x["I"])
+    print(f"SEIR: peak={peak2['I']} on day {peak2['day']}")
+    print("Epidemic sim OK")
