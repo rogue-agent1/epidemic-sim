@@ -1,11 +1,11 @@
-# epidemic-sim
+# epidemic_sim
 
-SIR epidemic model simulation.
+epidemic_sim - SIR/SEIR epidemic model simulator.
 
-Zero dependencies. Python 3.8+.
+Zero-dependency, single-file Python CLI.
 
 ## Usage
 
 ```bash
-python3 epidemic_sim.py --help
+python3 epidemic_sim.py
 ```
