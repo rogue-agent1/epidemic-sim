@@ -1,49 +1,77 @@
 #!/usr/bin/env python3
-"""epidemic_sim - SIR/SEIR epidemic model simulator."""
-import sys, json, math
+"""Epidemic simulation (SIR/SEIR models). Zero dependencies."""
+import random, sys
 
-def sir_model(S0, I0, R0, beta, gamma, days):
-    N = S0 + I0 + R0; S, I, R = float(S0), float(I0), float(R0)
-    history = [{"day": 0, "S": S, "I": I, "R": R}]
-    for d in range(1, days+1):
-        dS = -beta*S*I/N; dI = beta*S*I/N - gamma*I; dR = gamma*I
-        S += dS; I += dI; R += dR
-        history.append({"day": d, "S": round(S), "I": round(I), "R": round(R)})
-    return history
+class SIR:
+    def __init__(self, pop, infected=1, beta=0.3, gamma=0.1):
+        self.S = pop - infected
+        self.I = infected
+        self.R = 0
+        self.N = pop
+        self.beta = beta
+        self.gamma = gamma
+        self.history = {"S": [self.S], "I": [self.I], "R": [self.R]}
 
-def seir_model(S0, E0, I0, R0, beta, sigma, gamma, days):
-    N = S0+E0+I0+R0; S,E,I,R = float(S0),float(E0),float(I0),float(R0)
-    history = [{"day": 0, "S": S, "E": E, "I": I, "R": R}]
-    for d in range(1, days+1):
-        dS = -beta*S*I/N; dE = beta*S*I/N - sigma*E
-        dI = sigma*E - gamma*I; dR = gamma*I
-        S += dS; E += dE; I += dI; R += dR
-        history.append({"day": d, "S": round(S), "E": round(E), "I": round(I), "R": round(R)})
-    return history
+    def step(self, dt=1):
+        dS = -self.beta * self.S * self.I / self.N * dt
+        dI = (self.beta * self.S * self.I / self.N - self.gamma * self.I) * dt
+        dR = self.gamma * self.I * dt
+        self.S += dS; self.I += dI; self.R += dR
+        self.S = max(0, self.S); self.I = max(0, self.I); self.R = max(0, self.R)
+        self.history["S"].append(self.S)
+        self.history["I"].append(self.I)
+        self.history["R"].append(self.R)
 
-def r0(beta, gamma):
-    return beta / gamma
+    def run(self, days):
+        for _ in range(days): self.step()
+        return self.history
 
-def peak_infections(history):
-    return max(history, key=lambda x: x["I"])
+    def r0(self):
+        return self.beta / self.gamma
 
-def herd_immunity_threshold(R0):
-    return 1 - 1/R0 if R0 > 1 else 0
+    def peak_infected(self):
+        return max(self.history["I"])
 
-def main():
-    print("Epidemic simulation demo\n")
-    pop = 100000; beta = 0.3; gamma = 0.1
-    R0 = r0(beta, gamma)
-    print(f"  R0 = {R0:.1f}, Herd immunity threshold: {herd_immunity_threshold(R0)*100:.0f}%")
-    sir = sir_model(pop-10, 10, 0, beta, gamma, 200)
-    peak = peak_infections(sir)
-    print(f"\n  SIR (β={beta}, γ={gamma}):")
-    print(f"    Peak: day {peak['day']}, {peak['I']} infected")
-    print(f"    Final: {sir[-1]['R']} recovered, {sir[-1]['S']} susceptible")
-    seir = seir_model(pop-10, 0, 10, 0, beta, 0.2, gamma, 200)
-    peak2 = peak_infections(seir)
-    print(f"\n  SEIR (σ=0.2 incubation):")
-    print(f"    Peak: day {peak2['day']}, {peak2['I']} infected")
+    def herd_immunity_threshold(self):
+        return 1 - 1/self.r0()
+
+class SEIR(SIR):
+    def __init__(self, pop, infected=1, beta=0.3, gamma=0.1, sigma=0.2):
+        super().__init__(pop, infected, beta, gamma)
+        self.E = 0
+        self.sigma = sigma
+        self.history["E"] = [0]
+
+    def step(self, dt=1):
+        dS = -self.beta * self.S * self.I / self.N * dt
+        dE = (self.beta * self.S * self.I / self.N - self.sigma * self.E) * dt
+        dI = (self.sigma * self.E - self.gamma * self.I) * dt
+        dR = self.gamma * self.I * dt
+        self.S += dS; self.E += dE; self.I += dI; self.R += dR
+        for attr in ("S","E","I","R"):
+            setattr(self, attr, max(0, getattr(self, attr)))
+        for attr in ("S","E","I","R"):
+            self.history[attr].append(getattr(self, attr))
+
+def summary(model):
+    h = model.history
+    return {
+        "R0": round(model.r0(), 2),
+        "peak_infected": round(model.peak_infected()),
+        "total_infected": round(h["R"][-1]),
+        "herd_immunity": f"{model.herd_immunity_threshold()*100:.1f}%",
+        "days": len(h["S"]) - 1,
+    }
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    p = argparse.ArgumentParser(description="Epidemic simulation")
+    p.add_argument("-p", "--pop", type=int, default=10000)
+    p.add_argument("-b", "--beta", type=float, default=0.3)
+    p.add_argument("-g", "--gamma", type=float, default=0.1)
+    p.add_argument("-d", "--days", type=int, default=200)
+    args = p.parse_args()
+    m = SIR(args.pop, beta=args.beta, gamma=args.gamma)
+    m.run(args.days)
+    for k, v in summary(m).items():
+        print(f"{k}: {v}")
